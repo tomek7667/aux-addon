@@ -302,6 +302,11 @@ end
 
 local post_all_queue, post_all_in_progress
 
+function stop_post_all()
+	post_all_in_progress = false
+	post_all_queue = nil
+end
+
 function post_all_auctions()
 	if post_all_in_progress then
 		return
@@ -330,16 +335,18 @@ function post_all_auctions()
 end
 
 function post_all_next_item()
-	if not post_all_in_progress or not frame:IsShown() then
-		post_all_in_progress = false
-		post_all_queue = nil
+	if not frame:IsShown() then
+		stop_post_all()
+		return
+	end
+	
+	if not post_all_in_progress then
 		return
 	end
 	
 	if #post_all_queue == 0 then
 		aux.print("Post All complete")
-		post_all_in_progress = false
-		post_all_queue = nil
+		stop_post_all()
 		update_inventory_records()
 		refresh = true
 		return
@@ -384,6 +391,9 @@ function post_all_next_item()
 		duration_code = 3
 	elseif duration == DURATION_24 then
 		duration_code = 4
+	else
+		-- Default to 8 hours if duration is not set or invalid
+		duration_code = 3
 	end
 	
 	post.start(
@@ -395,8 +405,7 @@ function post_all_next_item()
 		stack_count,
 		function(posted)
 			if not frame:IsShown() then
-				post_all_in_progress = false
-				post_all_queue = nil
+				stop_post_all()
 				return
 			end
 			for i = 1, posted do
