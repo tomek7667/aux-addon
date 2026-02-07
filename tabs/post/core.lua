@@ -300,24 +300,144 @@ function M.post_auctions_bind()
 	end
 end
 
+local post_all_queue, post_all_in_progress
+
+function post_all_auctions()
+	if post_all_in_progress then
+		return
+	end
+	
+	-- Build the queue of items to post
+	post_all_queue = {}
+	for _, item_record in inventory_records do
+		local settings = read_settings(item_record.key)
+		-- Only include items that are not hidden and have quantity > 0
+		if item_record.aux_quantity > 0 and not settings.hidden then
+			tinsert(post_all_queue, T.map(
+				'item_record', item_record,
+				'settings', settings
+			))
+		end
+	end
+	
+	if #post_all_queue == 0 then
+		aux.print("No items available to post")
+		return
+	end
+	
+	post_all_in_progress = true
+	post_all_next_item()
+end
+
+function post_all_next_item()
+	if not post_all_in_progress or not frame:IsShown() then
+		post_all_in_progress = false
+		post_all_queue = nil
+		return
+	end
+	
+	if #post_all_queue == 0 then
+		aux.print("Post All complete")
+		post_all_in_progress = false
+		post_all_queue = nil
+		update_inventory_records()
+		refresh = true
+		return
+	end
+	
+	local queue_entry = tremove(post_all_queue, 1)
+	local item_record = queue_entry.item_record
+	local settings = queue_entry.settings
+	local key = item_record.key
+	
+	-- Calculate stack count - use full available quantity divided by stack size
+	local stack_size
+	if item_record.max_charges then
+		stack_size = 1
+		for i = item_record.max_charges, 1, -1 do
+			if item_record.availability[i] > 0 then
+				stack_size = i
+				break
+			end
+		end
+	else
+		stack_size = settings.stack_size and settings.stack_size > 0 and settings.stack_size or min(item_record.max_stack, item_record.aux_quantity)
+		stack_size = min(stack_size, item_record.max_stack, item_record.aux_quantity)
+	end
+	
+	local stack_count = item_record.max_charges and item_record.availability[stack_size] or floor(item_record.availability[0] / stack_size)
+	
+	if stack_count == 0 then
+		-- Skip this item and move to next
+		post_all_next_item()
+		return
+	end
+	
+	local unit_start_price = settings.start_price
+	local unit_buyout_price = settings.buyout_price
+	local duration = settings.duration
+	
+	local duration_code
+	if duration == DURATION_2 then
+		duration_code = 2
+	elseif duration == DURATION_8 then
+		duration_code = 3
+	elseif duration == DURATION_24 then
+		duration_code = 4
+	end
+	
+	post.start(
+		key,
+		stack_size,
+		duration,
+		unit_start_price,
+		unit_buyout_price,
+		stack_count,
+		function(posted)
+			if not frame:IsShown() then
+				post_all_in_progress = false
+				post_all_queue = nil
+				return
+			end
+			for i = 1, posted do
+				record_auction(key, stack_size, unit_start_price * stack_size, unit_buyout_price, duration_code, UnitName'player')
+			end
+			-- Continue to next item
+			post_all_next_item()
+		end
+	)
+end
+
 function validate_parameters()
     if not selected_item then
         post_button:Disable()
-        return
+    else
+        if get_unit_buyout_price() > 0 and get_unit_start_price() > get_unit_buyout_price() then
+            post_button:Disable()
+        elseif get_unit_start_price() == 0 then
+            post_button:Enable()
+        elseif stack_count_slider:GetValue() == 0 then
+            post_button:Disable()
+        else
+            post_button:Enable()
+        end
     end
-    if get_unit_buyout_price() > 0 and get_unit_start_price() > get_unit_buyout_price() then
-        post_button:Disable()
-        return
+    
+    -- Validate Post All button - enable if there are non-hidden items
+    local has_items = false
+    for _, item_record in inventory_records do
+        local settings = read_settings(item_record.key)
+        if item_record.aux_quantity > 0 and not settings.hidden then
+            has_items = true
+            break
+        end
     end
-    if get_unit_start_price() == 0 then
-        post_button:Enable()
-        return
+    
+    if has_items and not post_all_in_progress then
+        post_all_button:Enable()
+    else
+        post_all_button:Disable()
     end
-    if stack_count_slider:GetValue() == 0 then
-        post_button:Disable()
-        return
-    end
-    post_button:Enable()
 end
 
 function update_item_configuration()
