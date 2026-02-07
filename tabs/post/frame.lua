@@ -141,6 +141,13 @@ function aux.handle.INIT_UI()
     do
         local btn = gui.button(frame.parameters)
         btn:SetPoint('TOPLEFT', post_button, 'TOPRIGHT', 5, 0)
+        btn:SetText('Post All')
+        btn:SetScript('OnClick', post_all_auctions)
+        post_all_button = btn
+    end
+    do
+        local btn = gui.button(frame.parameters)
+        btn:SetPoint('TOPLEFT', post_all_button, 'TOPRIGHT', 5, 0)
         btn:SetText('Refresh')
         btn:SetScript('OnClick', refresh_button_click)
         refresh_button = btn
