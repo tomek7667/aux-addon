@@ -1,8 +1,9 @@
 ## Interface: 11200
-## Author: shirsig
+## Author: tomek7667
 ## OptionalDeps: ShaguTweaks
+## Version: 2.0.0
 ## Title: aux
-## Notes: Auction House replacement
+## Notes: Fork of Auction House replacement
 ## SavedVariables: aux
 
 libs\package.lua
