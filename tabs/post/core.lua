@@ -300,7 +300,8 @@ function M.post_auctions_bind()
 	end
 end
 
-local post_all_queue, post_all_in_progress
+local post_all_queue = nil
+local post_all_in_progress = false
 
 function stop_post_all()
 	post_all_in_progress = false
